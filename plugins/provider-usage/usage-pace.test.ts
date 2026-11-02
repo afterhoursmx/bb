@@ -181,6 +181,86 @@ describe("usage pace", () => {
     expect(formatPaceMargin(0)).toBe("0");
   });
 
+  it("uses each client's local close of 2 Nov 2026, not the host timezone", () => {
+    const now = "2026-11-02T18:42:00.000Z";
+    const host = pace({ now, timeZone: "Europe/Berlin" });
+    const zones = {
+      "America/Mexico_City": {
+        targetAt: "2026-11-03T06:00:00.000Z",
+        idealPercent: 39.60035842293907,
+      },
+      "Europe/Madrid": {
+        targetAt: "2026-11-02T23:00:00.000Z",
+        idealPercent: 38.6594982078853,
+      },
+      "America/New_York": {
+        targetAt: "2026-11-03T05:00:00.000Z",
+        idealPercent: 39.46594982078853,
+      },
+    } as const;
+    for (const [timeZone, expected] of Object.entries(zones)) {
+      const auto = pace({
+        usedPercent: OBSERVED_AUTO,
+        now,
+        timeZone,
+      });
+      const api = pace({
+        usedPercent: OBSERVED_API,
+        now,
+        timeZone,
+      });
+      expect(auto!.targetAt.toISOString()).toBe(expected.targetAt);
+      expect(auto!.idealPercent).toBeCloseTo(expected.idealPercent, 8);
+      expect(auto!.idealPercent).toBeLessThan(100);
+      expect(auto!.marginPercent).toBeCloseTo(
+        expected.idealPercent - OBSERVED_AUTO,
+        8,
+      );
+      expect(api!.marginPercent).toBeCloseTo(
+        expected.idealPercent - OBSERVED_API,
+        8,
+      );
+      if (timeZone !== "Europe/Madrid") {
+        expect(auto!.targetAt.toISOString()).not.toBe(
+          host!.targetAt.toISOString(),
+        );
+      }
+    }
+    expect(host!.targetAt.toISOString()).toBe("2026-11-02T23:00:00.000Z");
+    expect(host!.idealPercent).toBeCloseTo(38.6594982078853, 8);
+    expect(
+      pace({ now, timeZone: "America/Mexico_City" })!.marginPercent,
+    ).toBeCloseTo(16.8346917562724, 8);
+    expect(
+      pace({
+        usedPercent: OBSERVED_API,
+        now,
+        timeZone: "America/Mexico_City",
+      })!.marginPercent,
+    ).toBeCloseTo(6.280358422939068, 8);
+  });
+
+  it("does not keep the previous cycle after a reset", () => {
+    const nextStart = OBSERVED_CYCLE_END;
+    const nextEnd = "2026-12-21T23:22:24.000Z";
+    const afterReset = pace({
+      usedPercent: 2,
+      cycleStartsAt: nextStart,
+      cycleEndsAt: nextEnd,
+      now: "2026-11-22T15:00:00.000Z",
+      timeZone: "America/Mexico_City",
+    });
+    const stalePrevious = pace({
+      usedPercent: 2,
+      now: "2026-11-22T15:00:00.000Z",
+      timeZone: "America/Mexico_City",
+    });
+    expect(afterReset!.targetAt.toISOString()).not.toBe(OBSERVED_CYCLE_END);
+    expect(afterReset!.idealPercent).toBeLessThan(10);
+    expect(stalePrevious!.targetAt.toISOString()).toBe(OBSERVED_CYCLE_END);
+    expect(stalePrevious!.idealPercent).toBe(100);
+  });
+
   it("returns null when cycle bounds or timezone are missing or invalid", () => {
     const now = "2026-11-02T18:42:00.000Z";
     expect(

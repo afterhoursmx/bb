@@ -528,3 +528,87 @@ export function Disclosure() {
     </ScenarioRows>
   );
 }
+
+function cursorPaceAccount(
+  cursorUsed: number,
+  otherUsed: number,
+): UsageProvider {
+  return liveAccount("m4-cursor-pace", "acp-cursor", null, {
+    status: "ok",
+    accountEmail: "cursor@example.com",
+    planLabel: "Ultra",
+    windows: [
+      {
+        label: "Cursor Models",
+        usedPercent: cursorUsed,
+        resetsAt: "2026-11-21T23:22:24.000Z",
+        cycleStartsAt: "2026-10-21T23:22:24.000Z",
+        cost: null,
+      },
+      {
+        label: "Other Models",
+        usedPercent: otherUsed,
+        resetsAt: "2026-11-21T23:22:24.000Z",
+        cycleStartsAt: "2026-10-21T23:22:24.000Z",
+        cost: null,
+      },
+    ],
+  });
+}
+
+function CursorPaceCard({
+  width,
+  cursorUsed,
+  otherUsed,
+}: {
+  width: number;
+  cursorUsed: number;
+  otherUsed: number;
+}) {
+  return (
+    <div
+      className="overflow-hidden rounded-xl border border-sidebar-border bg-sidebar text-sidebar-foreground"
+      style={{ width }}
+    >
+      <ProviderUsageStatusContent
+        pluginId="bb--provider-usage"
+        dismiss={() => {}}
+        snapshot={{
+          data: {
+            machines: [
+              machine("host-m4", "M4", [
+                cursorPaceAccount(cursorUsed, otherUsed),
+                liveAccount("m4-codex", "codex", null, liveCodexWork),
+              ]),
+            ],
+          },
+          error: null,
+          isRefreshing: false,
+        }}
+        threadMachineId={null}
+        refreshEnabled={false}
+        timeZone="America/Mexico_City"
+        now={Date.parse("2026-11-02T18:42:00.000Z")}
+      />
+    </div>
+  );
+}
+
+export function CursorUsagePace() {
+  return (
+    <div className="m-6 flex flex-wrap items-start gap-6">
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          240px · Mexico City · under pace
+        </p>
+        <CursorPaceCard width={240} cursorUsed={23} otherUsed={33} />
+      </div>
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          303px · Mexico City · over pace
+        </p>
+        <CursorPaceCard width={303} cursorUsed={55} otherUsed={48} />
+      </div>
+    </div>
+  );
+}

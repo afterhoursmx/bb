@@ -278,9 +278,11 @@ const USAGE_GRID_CLASS_NAME =
 function UsageWindow({
   window,
   now,
+  timeZone,
 }: {
   window: UsageWindowValue;
   now: number;
+  timeZone: string;
 }) {
   const [showReset, setShowReset] = useState(false);
   const reset = formatUsageReset(window.resetsAt);
@@ -290,7 +292,7 @@ function UsageWindow({
     cycleStartsAt: window.cycleStartsAt,
     cycleEndsAt: window.resetsAt,
     now,
-    timeZone: resolveTimeZone(),
+    timeZone,
   });
   const paceSummary = pace ? describePaceMargin(pace.marginPercent) : null;
   const value =
@@ -387,12 +389,14 @@ function AccountUsage({
   unavailable,
   showProvider,
   now,
+  timeZone,
 }: {
   account: UsageProvider;
   loading: boolean;
   unavailable: boolean;
   showProvider: boolean;
   now: number;
+  timeZone: string;
 }) {
   const usage = account.usage;
   const email = usage?.status === "ok" ? usage.accountEmail : null;
@@ -444,7 +448,12 @@ function AccountUsage({
         </p>
       ) : usage?.status === "ok" ? (
         usage.windows.map((window) => (
-          <UsageWindow key={window.label} window={window} now={now} />
+          <UsageWindow
+            key={window.label}
+            window={window}
+            now={now}
+            timeZone={timeZone}
+          />
         ))
       ) : null}
     </section>
@@ -457,12 +466,14 @@ function ProviderAccounts({
   unavailable,
   showProvider,
   now,
+  timeZone,
 }: {
   accounts: UsageProvider[];
   loading: boolean;
   unavailable: boolean;
   showProvider: boolean;
   now: number;
+  timeZone: string;
 }) {
   return accounts.map((account) => (
     <AccountUsage
@@ -472,6 +483,7 @@ function ProviderAccounts({
       unavailable={unavailable}
       showProvider={showProvider}
       now={now}
+      timeZone={timeZone}
     />
   ));
 }
@@ -556,18 +568,27 @@ export function ProviderUsageStatusContent({
   threadMachineId,
   refreshEnabled = true,
   machineSelectionStorageKey = null,
+  timeZone,
+  now: nowOverride,
 }: ExperimentalSidebarFooterDisclosureProps & {
   pluginId: string;
   snapshot: UsageStoreSnapshot;
   threadMachineId: string | null;
   refreshEnabled?: boolean;
   machineSelectionStorageKey?: string | null;
+  timeZone?: string;
+  now?: number;
 }) {
-  const [now, setNow] = useState(() => Date.now());
+  const resolvedTimeZone = resolveTimeZone(timeZone);
+  const [now, setNow] = useState(() => nowOverride ?? Date.now());
   useEffect(() => {
+    if (nowOverride !== undefined) {
+      setNow(nowOverride);
+      return;
+    }
     const timer = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [nowOverride]);
   const machines = snapshot.data?.machines ?? [];
   const [requestedMachineId, setRequestedMachineId] = useState<string | null>(
     () => readSelectedMachine(machineSelectionStorageKey),
@@ -763,7 +784,7 @@ export function ProviderUsageStatusContent({
   };
 
   return (
-    <div className="flex max-h-80 flex-col">
+    <div className="flex max-h-80 flex-col" data-usage-timezone={resolvedTimeZone}>
       <div
         data-provider-usage-header=""
         className="flex h-9 min-w-0 shrink-0 items-center gap-1 border-b border-sidebar-border px-1.5"
@@ -933,6 +954,7 @@ export function ProviderUsageStatusContent({
                   unavailable={unavailable}
                   showProvider
                   now={now}
+                  timeZone={resolvedTimeZone}
                 />
               </div>
             ))}
@@ -945,6 +967,7 @@ export function ProviderUsageStatusContent({
               unavailable={unavailable}
               showProvider={false}
               now={now}
+              timeZone={resolvedTimeZone}
             />
           </div>
         )}
