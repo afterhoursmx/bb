@@ -137,6 +137,13 @@ export function computeUsagePace(input: UsagePaceInput): UsagePace | null {
   };
 }
 
+export function formatPaceCompact(
+  usedPercent: number,
+  idealPercent: number,
+): string {
+  return `${Math.round(usedPercent)} / ${Math.round(idealPercent)}%`;
+}
+
 export function formatPaceMargin(marginPercent: number): string {
   const rounded = Math.round(marginPercent);
   if (rounded === 0) return "0";

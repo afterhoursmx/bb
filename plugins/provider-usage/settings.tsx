@@ -28,9 +28,10 @@ import {
   type UsageSnapshot,
   type UsageWindow,
 } from "./usage-schema.js";
+import { UsagePaceBar } from "./usage-pace-bar.js";
 import {
   computeUsagePace,
-  describePaceMargin,
+  formatPaceCompact,
   resolveTimeZone,
 } from "./usage-pace.js";
 function SettingsBadge({ children }: { children: ReactNode }) {
@@ -121,45 +122,49 @@ function UsageWindowRow({ window }: { window: UsageWindow }) {
     return () => globalThis.clearInterval(timer);
   }, [window.cycleStartsAt, window.resetsAt]);
   const reset = formatReset(window.resetsAt);
+  const timeZone = resolveTimeZone();
   const pace = computeUsagePace({
     usedPercent: window.usedPercent,
     cycleStartsAt: window.cycleStartsAt,
     cycleEndsAt: window.resetsAt,
     now,
-    timeZone: resolveTimeZone(),
+    timeZone,
   });
+  const compact = pace
+    ? formatPaceCompact(window.usedPercent, pace.idealPercent)
+    : null;
   return (
     <div className="space-y-1">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs text-foreground">{window.label}</span>
         <span className="text-xs tabular-nums text-muted-foreground">
-          {usageWindowValue(window)}
+          {compact ?? usageWindowValue(window)}
         </span>
       </div>
-      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
-        <div
-          className={cn(
-            "h-full rounded-full",
-            barColorClass(window.usedPercent),
-          )}
-          style={{
-            width: `${Math.min(100, Math.max(window.usedPercent, 2))}%`,
-          }}
+      {pace ? (
+        <UsagePaceBar
+          usedPercent={window.usedPercent}
+          idealPercent={pace.idealPercent}
+          fillClassName={barColorClass(window.usedPercent)}
+          className="block h-1.5 w-full bg-muted"
         />
-        {pace ? (
-          <span
-            aria-hidden="true"
-            className="absolute top-0 h-full w-px bg-foreground/70"
+      ) : (
+        <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              "h-full rounded-full",
+              barColorClass(window.usedPercent),
+            )}
             style={{
-              left: `${Math.min(100, Math.max(0, pace.idealPercent))}%`,
+              width: `${Math.min(100, Math.max(window.usedPercent, 2))}%`,
             }}
           />
-        ) : null}
-      </div>
+        </div>
+      )}
       {reset ? <p className="text-xs text-muted-foreground">{reset}</p> : null}
       {pace ? (
         <p className="text-xs tabular-nums text-muted-foreground">
-          {describePaceMargin(pace.marginPercent)}
+          {`Today ${Math.round(pace.idealPercent)}%`}
         </p>
       ) : null}
     </div>

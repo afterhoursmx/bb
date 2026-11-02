@@ -3,10 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
 import { ProviderUsageStatusContent } from "./app.js";
-import {
-  computeUsagePace,
-  formatPaceMargin,
-} from "./usage-pace.js";
+import { computeUsagePace, formatPaceCompact } from "./usage-pace.js";
 import type { UsageProvider, UsageWindow } from "./usage-schema.js";
 
 installTestPluginRuntime();
@@ -120,33 +117,37 @@ describe("Cursor usage pace visual review", () => {
     expect(mexico.idealPercent).not.toBeCloseTo(berlinIdeal, 4);
     expect(under.container.textContent).toContain("Cursor");
     expect(under.container.textContent).toContain("Other");
-    expect(under.container.textContent).toContain("23%");
-    expect(under.container.textContent).toContain("33%");
     expect(under.container.textContent).toContain(
-      formatPaceMargin(mexico.marginPercent),
+      formatPaceCompact(23, mexico.idealPercent),
     );
     expect(under.container.textContent).toContain(
-      formatPaceMargin(
+      formatPaceCompact(
+        33,
         computeUsagePace({
           usedPercent: 33,
           cycleStartsAt: CYCLE_START,
           cycleEndsAt: CYCLE_END,
           now: NOW,
           timeZone: MEXICO,
-        })!.marginPercent,
+        })!.idealPercent,
       ),
     );
     expect(under.container.textContent).not.toContain("Plan usage");
+    expect(under.container.textContent).not.toMatch(/\+[0-9]+/u);
+    expect(
+      under.container.querySelectorAll("[data-usage-pace-room]"),
+    ).toHaveLength(2);
     expect(
       under.container.querySelectorAll("[data-usage-pace-ideal]"),
-    ).toHaveLength(2);
+    ).toHaveLength(0);
     const cursorRow = under.container.querySelector(
       '[aria-label*="Cursor Models"]',
     );
     expect(cursorRow).not.toBeNull();
     fireEvent.click(cursorRow!);
-    expect(under.container.textContent).toMatch(/Resets|Reset time/u);
-    expect(under.container.textContent).toMatch(
+    expect(under.container.textContent).toMatch(/Today 40%/u);
+    expect(under.container.textContent).toMatch(/Resets/u);
+    expect(under.container.textContent).not.toMatch(
       /remaining to stay on pace through today/u,
     );
     under.unmount();
@@ -192,16 +193,22 @@ describe("Cursor usage pace visual review", () => {
       303,
     );
     expect(over.container.textContent).toContain(
-      formatPaceMargin(
+      formatPaceCompact(
+        55,
         computeUsagePace({
           usedPercent: 55,
           cycleStartsAt: CYCLE_START,
           cycleEndsAt: CYCLE_END,
           now: NOW,
           timeZone: MEXICO,
-        })!.marginPercent,
+        })!.idealPercent,
       ),
     );
+    expect(over.container.querySelectorAll("[data-usage-pace-ideal]")).toHaveLength(
+      1,
+    );
+    expect(over.container.querySelector("[data-usage-pace-room]")).toBeNull();
+    expect(over.container.textContent).not.toMatch(/-[0-9]+/u);
     const cursorTab = over.container.querySelector(
       '[role="tab"][aria-label="Cursor"]',
     );

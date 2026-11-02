@@ -27,13 +27,14 @@ import {
 import { cn } from "@/lib/utils";
 import {
   formatUsageReset,
+  formatUsageResetDay,
   formatUsdCents,
   usageBarColorClass,
 } from "./usage-format.js";
+import { UsagePaceBar } from "./usage-pace-bar.js";
 import {
   computeUsagePace,
-  describePaceMargin,
-  formatPaceMargin,
+  formatPaceCompact,
   resolveTimeZone,
 } from "./usage-pace.js";
 import { LIST_HOVER_TRANSITION } from "@/components/ui/motion";
@@ -285,7 +286,8 @@ function UsageWindow({
   timeZone: string;
 }) {
   const [showReset, setShowReset] = useState(false);
-  const reset = formatUsageReset(window.resetsAt);
+  const reset = formatUsageReset(window.resetsAt, timeZone);
+  const resetDay = formatUsageResetDay(window.resetsAt, timeZone);
   const countdown = formatResetCountdown(window.resetsAt);
   const pace = computeUsagePace({
     usedPercent: window.usedPercent,
@@ -294,19 +296,27 @@ function UsageWindow({
     now,
     timeZone,
   });
-  const paceSummary = pace ? describePaceMargin(pace.marginPercent) : null;
+  const compact = pace
+    ? formatPaceCompact(window.usedPercent, pace.idealPercent)
+    : null;
   const value =
     window.cost === null
-      ? Math.round(window.usedPercent) + "% used"
+      ? (compact ?? Math.round(window.usedPercent) + "% used")
       : formatUsdCents(window.cost.usedUsdCents, true) +
         " / " +
         formatUsdCents(window.cost.limitUsdCents, false);
+  const expanded = pace
+    ? [
+        `Today ${Math.round(pace.idealPercent)}%`,
+        resetDay ? `Resets ${resetDay}` : (reset ?? "Reset time not reported"),
+      ].join(" · ")
+    : (reset ?? "Reset time not reported.");
   return (
     <button
       type="button"
       className="col-span-full grid grid-cols-subgrid rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-      title={`${window.label} · ${reset ?? "Reset time not reported"}${paceSummary ? ` · ${paceSummary}` : ""}`}
-      aria-label={`${window.label}: ${value}. ${reset ?? "Reset time not reported"}${paceSummary ? `. ${paceSummary}` : ""}`}
+      title={`${window.label} · ${value}${pace ? ` · ${expanded}` : reset ? ` · ${reset}` : ""}`}
+      aria-label={`${window.label}: ${value}. ${pace ? expanded : (reset ?? "Reset time not reported")}`}
       aria-expanded={showReset}
       onClick={() => setShowReset((shown) => !shown)}
     >
@@ -314,49 +324,58 @@ function UsageWindow({
         <span className="max-w-20 truncate text-subtle-foreground">
           {shortWindowLabel(window.label)}
         </span>
-        <span className="relative h-1 min-w-0 overflow-hidden rounded-full bg-sidebar-border">
-          <span
-            className={
-              "block h-full rounded-full " +
-              usageBarColorClass(window.usedPercent)
-            }
-            style={{
-              width: Math.max(2, Math.min(100, window.usedPercent)) + "%",
-            }}
+        {pace ? (
+          <UsagePaceBar
+            usedPercent={window.usedPercent}
+            idealPercent={pace.idealPercent}
+            fillClassName={usageBarColorClass(window.usedPercent)}
+            className="h-1 min-w-0"
           />
-          {pace ? (
+        ) : (
+          <span className="relative h-1 min-w-0 overflow-hidden rounded-full bg-sidebar-border">
             <span
-              aria-hidden="true"
-              data-usage-pace-ideal=""
-              className="absolute top-0 h-full w-px bg-sidebar-foreground/70"
+              className={
+                "block h-full rounded-full " +
+                usageBarColorClass(window.usedPercent)
+              }
               style={{
-                left: Math.min(100, Math.max(0, pace.idealPercent)) + "%",
+                width: Math.max(2, Math.min(100, window.usedPercent)) + "%",
               }}
             />
-          ) : null}
-        </span>
-        <span
-          className={cn(
-            "text-right tabular-nums",
-            usageToneTextClass(window.usedPercent),
-          )}
-        >
-          {Math.round(window.usedPercent)}%
-        </span>
-        <span
-          aria-hidden="true"
-          className="min-w-9 text-right tabular-nums text-subtle-foreground"
-        >
-          {pace
-            ? formatPaceMargin(pace.marginPercent)
-            : (countdown ?? "—")}
-        </span>
+          </span>
+        )}
+        {pace ? (
+          <span
+            className={cn(
+              "col-span-2 text-right tabular-nums",
+              usageToneTextClass(window.usedPercent),
+            )}
+          >
+            {compact}
+          </span>
+        ) : (
+          <>
+            <span
+              className={cn(
+                "text-right tabular-nums",
+                usageToneTextClass(window.usedPercent),
+              )}
+            >
+              {Math.round(window.usedPercent)}%
+            </span>
+            <span
+              aria-hidden="true"
+              className="min-w-9 text-right tabular-nums text-subtle-foreground"
+            >
+              {countdown ?? "—"}
+            </span>
+          </>
+        )}
       </span>
       {showReset ? (
         <span className="col-span-full pb-1 text-2xs text-subtle-foreground">
-          {reset ?? "Reset time not reported."}
+          {expanded}
           {window.cost === null ? "" : ` · ${value}`}
-          {paceSummary ? ` · ${paceSummary}` : ""}
         </span>
       ) : null}
     </button>

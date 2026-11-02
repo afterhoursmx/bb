@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeUsagePace,
+  formatPaceCompact,
   formatPaceMargin,
   nextLocalMidnight,
   zonedDateTimeToUtc,
@@ -179,6 +180,11 @@ describe("usage pace", () => {
     expect(formatPaceMargin(under!.marginPercent).startsWith("+")).toBe(true);
     expect(formatPaceMargin(over!.marginPercent).startsWith("-")).toBe(true);
     expect(formatPaceMargin(0)).toBe("0");
+    expect(formatPaceCompact(22.77, under!.idealPercent)).toMatch(
+      /^\d+ \/ \d+%$/u,
+    );
+    expect(formatPaceCompact(22.77, 39.6)).toBe("23 / 40%");
+    expect(formatPaceCompact(48.2, 39.6)).toBe("48 / 40%");
   });
 
   it("uses each client's local close of 2 Nov 2026, not the host timezone", () => {

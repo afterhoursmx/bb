@@ -4,7 +4,10 @@ export function usageBarColorClass(usedPercent: number): string {
   return "bg-primary";
 }
 
-export function formatUsageReset(resetsAt: string | null): string | null {
+export function formatUsageReset(
+  resetsAt: string | null,
+  timeZone?: string,
+): string | null {
   if (resetsAt === null) return null;
   const reset = new Date(resetsAt);
   if (Number.isNaN(reset.getTime())) return null;
@@ -21,6 +24,7 @@ export function formatUsageReset(resetsAt: string | null): string | null {
   }
   const withinWeek = diffMs < 7 * 24 * 60 * 60_000;
   const formatted = reset.toLocaleString(undefined, {
+    timeZone,
     weekday: withinWeek ? "short" : undefined,
     month: withinWeek ? undefined : "short",
     day: withinWeek ? undefined : "numeric",
@@ -28,6 +32,20 @@ export function formatUsageReset(resetsAt: string | null): string | null {
     minute: "2-digit",
   });
   return `Resets ${formatted}`;
+}
+
+export function formatUsageResetDay(
+  resetsAt: string | null,
+  timeZone?: string,
+): string | null {
+  if (resetsAt === null) return null;
+  const reset = new Date(resetsAt);
+  if (Number.isNaN(reset.getTime())) return null;
+  return reset.toLocaleDateString(undefined, {
+    timeZone,
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function formatUsdCents(

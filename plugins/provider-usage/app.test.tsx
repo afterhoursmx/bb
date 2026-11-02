@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UsageProvider } from "./usage-schema.js";
 import {
   computeUsagePace,
-  formatPaceMargin,
+  formatPaceCompact,
   resolveTimeZone,
 } from "./usage-pace.js";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
@@ -651,23 +651,25 @@ it("shows separate Cursor quotas and compact pace without a combined bar", async
   const cycleStartsAt = "2026-10-21T23:22:24.000Z";
   const cycleEndsAt = "2026-11-21T23:22:24.000Z";
   const timeZone = resolveTimeZone();
-  const cursorMargin = formatPaceMargin(
+  const cursorCompact = formatPaceCompact(
+    23,
     computeUsagePace({
       usedPercent: 23,
       cycleStartsAt,
       cycleEndsAt,
       now,
       timeZone,
-    })!.marginPercent,
+    })!.idealPercent,
   );
-  const otherMargin = formatPaceMargin(
+  const otherCompact = formatPaceCompact(
+    33,
     computeUsagePace({
       usedPercent: 33,
       cycleStartsAt,
       cycleEndsAt,
       now,
       timeZone,
-    })!.marginPercent,
+    })!.idealPercent,
   );
   vi.stubGlobal(
     "fetch",
@@ -756,16 +758,15 @@ it("shows separate Cursor quotas and compact pace without a combined bar", async
     { dismiss: vi.fn() },
     { pluginId: "bb--provider-usage" },
   );
-  await waitFor(() => expect(slot.getByText("23%")).toBeTruthy());
+  await waitFor(() => expect(slot.getByText(cursorCompact)).toBeTruthy());
   expect(slot.getByText("Cursor")).toBeTruthy();
   expect(slot.getByText("Other")).toBeTruthy();
-  expect(slot.getByText("23%")).toBeTruthy();
-  expect(slot.getByText("33%")).toBeTruthy();
-  expect(slot.getAllByText(cursorMargin).length).toBeGreaterThan(0);
-  expect(slot.getByText(otherMargin)).toBeTruthy();
-  expect(slot.container.querySelectorAll("[data-usage-pace-ideal]")).toHaveLength(
-    2,
-  );
+  expect(slot.getByText(cursorCompact)).toBeTruthy();
+  expect(slot.getByText(otherCompact)).toBeTruthy();
+  expect(
+    slot.container.querySelectorAll("[data-usage-pace-room]"),
+  ).toHaveLength(2);
+  expect(slot.container.querySelector("[data-usage-pace-ideal]")).toBeNull();
   expect(slot.queryByText("Plan usage")).toBeNull();
   fireEvent.click(slot.getByRole("tab", { name: "Codex" }));
   expect(slot.getByText("37%")).toBeTruthy();
