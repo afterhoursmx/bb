@@ -18,7 +18,12 @@ it("publishes only its own maintenance providers without a display and only meas
       accountEmail: "same@example.com",
       planLabel: "Custom subscription",
       windows: [
-        { label: "Tokens this month", usedPercent: 42, resetsAt: null },
+        {
+          label: "Tokens this month",
+          usedPercent: 42,
+          resetsAt: null,
+          cycleStartsAt: "2026-10-21T23:22:24.000Z",
+        },
       ],
     },
   }));
@@ -89,7 +94,13 @@ it("publishes only its own maintenance providers without a display and only meas
         status: "ok",
         plan: null,
         planLabel: "Custom subscription",
-        windows: [{ kind: "custom", label: "Tokens this month" }],
+        windows: [
+          {
+            kind: "custom",
+            label: "Tokens this month",
+            cycleStartsAt: "2026-10-21T23:22:24.000Z",
+          },
+        ],
       },
     });
     expect(collect).toHaveBeenCalledWith({

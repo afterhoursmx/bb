@@ -10,6 +10,7 @@ export const usageWindowSchema = z.strictObject({
   label: nonemptyStringSchema,
   usedPercent: z.number(),
   resetsAt: z.nullable(nonemptyStringSchema),
+  cycleStartsAt: z.optional(z.nullable(nonemptyStringSchema)),
   cost: z.nullable(costSchema),
 });
 

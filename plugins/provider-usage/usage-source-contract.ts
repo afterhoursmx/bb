@@ -28,6 +28,13 @@ const usageWindowSchema = z.object({
     .string()
     .nullable()
     .describe("ISO timestamp, or null when no reset is known."),
+  cycleStartsAt: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "ISO timestamp when this billing cycle started, or null when unknown.",
+    ),
   model: z
     .string()
     .nullable()

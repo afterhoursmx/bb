@@ -355,3 +355,113 @@ it("collapses known account observations per machine, preserves unknown identiti
     await harness.lifecycle.dispose();
   }
 });
+
+it("forwards Cursor cycle bounds without inventing a combined usage bar", async () => {
+  const { bb, harness } = createFakePluginHost({
+    pluginId: "provider-usage",
+    sdk: {
+      system: { config: async () => ({ primaryHostId: null }) },
+      hosts: {
+        list: async () => [
+          makeHostResponse({
+            id: "host",
+            name: "Machine",
+            status: "connected",
+          }),
+        ],
+      },
+      providers: {
+        list: async () => [
+          { id: "acp-cursor", displayName: "Cursor", logoUrl: "/cursor.svg" },
+          { id: "codex", displayName: "Codex", logoUrl: "/codex.svg" },
+        ],
+      },
+      plugins: {
+        experimental_discoverRpc: async () => [
+          {
+            pluginId: "acp",
+            displayName: "ACP",
+            method: usageListMethod,
+          },
+        ],
+        callRpc: async ({ method }) => {
+          if (method === usageListMethod)
+            return {
+              resources: [
+                {
+                  id: "cursor",
+                  providerId: "acp-cursor",
+                  label: "Cursor",
+                  scope: { kind: "host", hostId: "host", hostName: "Machine" },
+                },
+              ],
+            };
+          return {
+            observedAt: 123,
+            usage: {
+              status: "ok",
+              accountEmail: "cursor@example.com",
+              planLabel: "Ultra",
+              windows: [
+                {
+                  id: "auto",
+                  label: "Cursor Models",
+                  usedPercent: 23,
+                  resetsAt: "2026-11-21T23:22:24.000Z",
+                  cycleStartsAt: "2026-10-21T23:22:24.000Z",
+                  model: null,
+                  cost: null,
+                },
+                {
+                  id: "api",
+                  label: "Other Models",
+                  usedPercent: 33,
+                  resetsAt: "2026-11-21T23:22:24.000Z",
+                  cycleStartsAt: "2026-10-21T23:22:24.000Z",
+                  model: null,
+                  cost: null,
+                },
+              ],
+            },
+          };
+        },
+      },
+    },
+  });
+  try {
+    plugin(bb);
+    const snapshot = await harness.behavior.callRpc("getUsage", {
+      force: false,
+      machineIds: ["host"],
+      providerIds: ["acp-cursor"],
+      maxAgeMs: 0,
+    });
+    expect(snapshot).toMatchObject({
+      machines: [
+        {
+          providers: [
+            {
+              usage: {
+                windows: [
+                  {
+                    label: "Cursor Models",
+                    usedPercent: 23,
+                    cycleStartsAt: "2026-10-21T23:22:24.000Z",
+                  },
+                  {
+                    label: "Other Models",
+                    usedPercent: 33,
+                    cycleStartsAt: "2026-10-21T23:22:24.000Z",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("Plan usage");
+  } finally {
+    await harness.lifecycle.dispose();
+  }
+});

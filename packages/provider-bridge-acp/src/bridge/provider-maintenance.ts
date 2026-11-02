@@ -297,12 +297,19 @@ const cursorNonNegativeIntegerSchema = z
   ])
   .refine(Number.isSafeInteger);
 
+const cursorPlanUsageSchema = z
+  .object({
+    totalPercentUsed: z.number().nonnegative().optional(),
+    autoPercentUsed: z.number().nonnegative().optional(),
+    apiPercentUsed: z.number().nonnegative().optional(),
+  })
+  .passthrough();
+
 const cursorUsageResponseSchema = z
   .object({
+    billingCycleStart: cursorNonNegativeIntegerSchema.nullish(),
     billingCycleEnd: cursorNonNegativeIntegerSchema.nullish(),
-    planUsage: z
-      .object({ totalPercentUsed: z.number().nonnegative().default(0) })
-      .nullish(),
+    planUsage: cursorPlanUsageSchema.nullish(),
     spendLimitUsage: z
       .object({
         overallLimit: cursorNonNegativeIntegerSchema.nullish(),
@@ -322,6 +329,30 @@ const cursorPlanResponseSchema = z
   })
   .passthrough();
 
+function isoFromCursorInstant(
+  value: number | null | undefined,
+): string | null {
+  if (value == null) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function pushPercentWindow(
+  windows: ProviderUsageWindow[],
+  label: string,
+  usedPercent: number | undefined,
+  resetsAt: string | null,
+  cycleStartsAt: string | null,
+): void {
+  if (usedPercent == null) return;
+  windows.push({
+    label,
+    usedPercent: clampPercent(usedPercent),
+    resetsAt,
+    cycleStartsAt,
+  });
+}
+
 function normalizeUsage(
   rawUsage: unknown,
   rawPlan: unknown,
@@ -337,17 +368,35 @@ function normalizeUsage(
     };
   }
   const plan = cursorPlanResponseSchema.safeParse(rawPlan);
-  const resetsAt =
-    usage.data.billingCycleEnd == null
-      ? null
-      : new Date(usage.data.billingCycleEnd).toISOString();
+  const resetsAt = isoFromCursorInstant(usage.data.billingCycleEnd);
+  const cycleStartsAt = isoFromCursorInstant(usage.data.billingCycleStart);
   const windows: ProviderUsageWindow[] = [];
-  if (usage.data.planUsage?.totalPercentUsed != null) {
-    windows.push({
-      label: "Plan usage",
-      usedPercent: clampPercent(usage.data.planUsage.totalPercentUsed),
+  const planUsage = usage.data.planUsage;
+  const hasSplitPools =
+    planUsage?.autoPercentUsed != null || planUsage?.apiPercentUsed != null;
+  if (hasSplitPools) {
+    pushPercentWindow(
+      windows,
+      "Cursor Models",
+      planUsage?.autoPercentUsed,
       resetsAt,
-    });
+      cycleStartsAt,
+    );
+    pushPercentWindow(
+      windows,
+      "Other Models",
+      planUsage?.apiPercentUsed,
+      resetsAt,
+      cycleStartsAt,
+    );
+  } else {
+    pushPercentWindow(
+      windows,
+      "Plan usage",
+      planUsage?.totalPercentUsed,
+      resetsAt,
+      cycleStartsAt,
+    );
   }
   const spend = usage.data.spendLimitUsage;
   const pair =

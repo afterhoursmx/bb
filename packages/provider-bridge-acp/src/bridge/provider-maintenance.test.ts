@@ -110,12 +110,73 @@ describe("ACP provider maintenance", () => {
           label: "Plan usage",
           usedPercent: 72,
           resetsAt: "2026-01-01T00:00:00.000Z",
+          cycleStartsAt: null,
         },
         {
           label: "On-demand spend",
           usedPercent: 25,
           resetsAt: "2026-01-01T00:00:00.000Z",
           cost: { usedUsdCents: 1250, limitUsdCents: 5000 },
+        },
+      ],
+    });
+  });
+
+  it("publishes Cursor Models and Other Models from the observed cycle without a combined bar", () => {
+    expect(
+      __testing.normalizeUsage(
+        {
+          billingCycleStart: "1792624944000",
+          billingCycleEnd: "1795303344000",
+          planUsage: {
+            autoPercentUsed: 22.7656666667,
+            apiPercentUsed: 33.32,
+            totalPercentUsed: 23.18784,
+          },
+        },
+        { planInfo: { planName: "Ultra" } },
+        "cursor@example.com",
+      ),
+    ).toEqual({
+      status: "ok",
+      accountEmail: "cursor@example.com",
+      planLabel: "Ultra",
+      windows: [
+        {
+          label: "Cursor Models",
+          usedPercent: 23,
+          resetsAt: "2026-11-21T23:22:24.000Z",
+          cycleStartsAt: "2026-10-21T23:22:24.000Z",
+        },
+        {
+          label: "Other Models",
+          usedPercent: 33,
+          resetsAt: "2026-11-21T23:22:24.000Z",
+          cycleStartsAt: "2026-10-21T23:22:24.000Z",
+        },
+      ],
+    });
+  });
+
+  it("keeps a single pool when only one split field is present and ignores a missing cycle start", () => {
+    expect(
+      __testing.normalizeUsage(
+        {
+          billingCycleEnd: "1795303344000",
+          planUsage: { autoPercentUsed: 41.2 },
+        },
+        {},
+      ),
+    ).toEqual({
+      status: "ok",
+      accountEmail: null,
+      planLabel: null,
+      windows: [
+        {
+          label: "Cursor Models",
+          usedPercent: 41,
+          resetsAt: "2026-11-21T23:22:24.000Z",
+          cycleStartsAt: null,
         },
       ],
     });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   selectUsageMachine,
   providerUsageTone,
+  usageWindowSchema,
   type UsageProvider,
   type UsageMachine,
 } from "./usage-schema.js";
@@ -36,6 +37,35 @@ function provider(
     },
   };
 }
+
+describe("usage window contract", () => {
+  it("keeps cycleStartsAt when present and accepts older windows without it", () => {
+    expect(
+      usageWindowSchema.parse({
+        label: "Cursor Models",
+        usedPercent: 23,
+        resetsAt: "2026-11-21T23:22:24.000Z",
+        cycleStartsAt: "2026-10-21T23:22:24.000Z",
+        cost: null,
+      }),
+    ).toMatchObject({
+      cycleStartsAt: "2026-10-21T23:22:24.000Z",
+    });
+    expect(
+      usageWindowSchema.parse({
+        label: "Weekly limit",
+        usedPercent: 42,
+        resetsAt: null,
+        cost: null,
+      }),
+    ).toEqual({
+      label: "Weekly limit",
+      usedPercent: 42,
+      resetsAt: null,
+      cost: null,
+    });
+  });
+});
 
 describe("usage warning state", () => {
   it("distinguishes normal, warning, and critical usage", () => {

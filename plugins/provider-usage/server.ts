@@ -73,6 +73,7 @@ function normalizedUsage(
           label: window.label,
           usedPercent: window.usedPercent,
           resetsAt: window.resetsAt || null,
+          cycleStartsAt: window.cycleStartsAt ?? null,
           cost: window.cost ?? null,
         })),
       };

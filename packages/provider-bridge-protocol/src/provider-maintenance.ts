@@ -55,6 +55,7 @@ export const providerUsageWindowSchema = z
     label: z.string().min(1),
     usedPercent: z.number().min(0).max(100),
     resetsAt: z.string().min(1).nullable(),
+    cycleStartsAt: z.string().min(1).nullable().optional(),
     cost: z
       .object({
         usedUsdCents: z.number().int().nonnegative(),
