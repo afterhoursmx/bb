@@ -30,6 +30,12 @@ import {
   formatUsdCents,
   usageBarColorClass,
 } from "./usage-format.js";
+import {
+  computeUsagePace,
+  describePaceMargin,
+  formatPaceMargin,
+  resolveTimeZone,
+} from "./usage-pace.js";
 import { LIST_HOVER_TRANSITION } from "@/components/ui/motion";
 import {
   OPTION_BASE_CLASS_NAME,
@@ -187,6 +193,8 @@ function formatResetCountdown(resetsAt: string | null): string | null {
 }
 function shortWindowLabel(label: string): string {
   return label
+    .replace(/^Cursor Models$/u, "Cursor")
+    .replace(/^Other Models$/u, "Other")
     .replace(/^Five-hour limit$|^5 hours$/u, "5h")
     .replace(/^Weekly limit$|^Weekly/u, "7d")
     .replace(/^Daily limit$/u, "1d");
@@ -267,10 +275,24 @@ function UsageNotice({
 const USAGE_GRID_CLASS_NAME =
   "grid grid-cols-[max-content_minmax(0,1fr)_max-content_max-content] gap-x-3";
 
-function UsageWindow({ window }: { window: UsageWindowValue }) {
+function UsageWindow({
+  window,
+  now,
+}: {
+  window: UsageWindowValue;
+  now: number;
+}) {
   const [showReset, setShowReset] = useState(false);
   const reset = formatUsageReset(window.resetsAt);
   const countdown = formatResetCountdown(window.resetsAt);
+  const pace = computeUsagePace({
+    usedPercent: window.usedPercent,
+    cycleStartsAt: window.cycleStartsAt,
+    cycleEndsAt: window.resetsAt,
+    now,
+    timeZone: resolveTimeZone(),
+  });
+  const paceSummary = pace ? describePaceMargin(pace.marginPercent) : null;
   const value =
     window.cost === null
       ? Math.round(window.usedPercent) + "% used"
@@ -281,8 +303,8 @@ function UsageWindow({ window }: { window: UsageWindowValue }) {
     <button
       type="button"
       className="col-span-full grid grid-cols-subgrid rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-      title={`${window.label} · ${reset ?? "Reset time not reported"}`}
-      aria-label={`${window.label}: ${value}. ${reset ?? "Reset time not reported"}`}
+      title={`${window.label} · ${reset ?? "Reset time not reported"}${paceSummary ? ` · ${paceSummary}` : ""}`}
+      aria-label={`${window.label}: ${value}. ${reset ?? "Reset time not reported"}${paceSummary ? `. ${paceSummary}` : ""}`}
       aria-expanded={showReset}
       onClick={() => setShowReset((shown) => !shown)}
     >
@@ -290,7 +312,7 @@ function UsageWindow({ window }: { window: UsageWindowValue }) {
         <span className="max-w-20 truncate text-subtle-foreground">
           {shortWindowLabel(window.label)}
         </span>
-        <span className="h-1 min-w-0 overflow-hidden rounded-full bg-sidebar-border">
+        <span className="relative h-1 min-w-0 overflow-hidden rounded-full bg-sidebar-border">
           <span
             className={
               "block h-full rounded-full " +
@@ -300,6 +322,16 @@ function UsageWindow({ window }: { window: UsageWindowValue }) {
               width: Math.max(2, Math.min(100, window.usedPercent)) + "%",
             }}
           />
+          {pace ? (
+            <span
+              aria-hidden="true"
+              data-usage-pace-ideal=""
+              className="absolute top-0 h-full w-px bg-sidebar-foreground/70"
+              style={{
+                left: Math.min(100, Math.max(0, pace.idealPercent)) + "%",
+              }}
+            />
+          ) : null}
         </span>
         <span
           className={cn(
@@ -313,13 +345,16 @@ function UsageWindow({ window }: { window: UsageWindowValue }) {
           aria-hidden="true"
           className="min-w-9 text-right tabular-nums text-subtle-foreground"
         >
-          {countdown ?? "—"}
+          {pace
+            ? formatPaceMargin(pace.marginPercent)
+            : (countdown ?? "—")}
         </span>
       </span>
       {showReset ? (
         <span className="col-span-full pb-1 text-2xs text-subtle-foreground">
           {reset ?? "Reset time not reported."}
           {window.cost === null ? "" : ` · ${value}`}
+          {paceSummary ? ` · ${paceSummary}` : ""}
         </span>
       ) : null}
     </button>
@@ -351,11 +386,13 @@ function AccountUsage({
   loading,
   unavailable,
   showProvider,
+  now,
 }: {
   account: UsageProvider;
   loading: boolean;
   unavailable: boolean;
   showProvider: boolean;
+  now: number;
 }) {
   const usage = account.usage;
   const email = usage?.status === "ok" ? usage.accountEmail : null;
@@ -407,7 +444,7 @@ function AccountUsage({
         </p>
       ) : usage?.status === "ok" ? (
         usage.windows.map((window) => (
-          <UsageWindow key={window.label} window={window} />
+          <UsageWindow key={window.label} window={window} now={now} />
         ))
       ) : null}
     </section>
@@ -419,11 +456,13 @@ function ProviderAccounts({
   loading,
   unavailable,
   showProvider,
+  now,
 }: {
   accounts: UsageProvider[];
   loading: boolean;
   unavailable: boolean;
   showProvider: boolean;
+  now: number;
 }) {
   return accounts.map((account) => (
     <AccountUsage
@@ -432,6 +471,7 @@ function ProviderAccounts({
       loading={loading}
       unavailable={unavailable}
       showProvider={showProvider}
+      now={now}
     />
   ));
 }
@@ -523,12 +563,9 @@ export function ProviderUsageStatusContent({
   refreshEnabled?: boolean;
   machineSelectionStorageKey?: string | null;
 }) {
-  const [, refreshCountdowns] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const timer = window.setInterval(
-      () => refreshCountdowns((tick) => tick + 1),
-      60_000,
-    );
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
   const machines = snapshot.data?.machines ?? [];
@@ -895,6 +932,7 @@ export function ProviderUsageStatusContent({
                   loading={snapshot.isRefreshing}
                   unavailable={unavailable}
                   showProvider
+                  now={now}
                 />
               </div>
             ))}
@@ -906,6 +944,7 @@ export function ProviderUsageStatusContent({
               loading={snapshot.isRefreshing}
               unavailable={unavailable}
               showProvider={false}
+              now={now}
             />
           </div>
         )}

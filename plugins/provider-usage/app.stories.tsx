@@ -204,16 +204,17 @@ function liveAccount(
 function liveUsage(
   email: string,
   planLabel: string,
-  windows: [string, number, number][],
+  windows: [string, number, number, string?][],
 ): ProviderUsage {
   return {
     status: "ok",
     accountEmail: email,
     planLabel,
-    windows: windows.map(([label, usedPercent, resetHours]) => ({
+    windows: windows.map(([label, usedPercent, resetHours, cycleStartsAt]) => ({
       label,
       usedPercent,
       resetsAt: futureIso(resetHours),
+      cycleStartsAt: cycleStartsAt ?? null,
       cost: null,
     })),
   };
@@ -239,7 +240,10 @@ const liveMachines = [
       "m4-cursor",
       "acp-cursor",
       null,
-      liveUsage("personal@example.com", "Free", [["Plan usage", 5, 413]]),
+      liveUsage("personal@example.com", "Ultra", [
+        ["Cursor Models", 23, 19 * 24, "2026-10-21T23:22:24.000Z"],
+        ["Other Models", 33, 19 * 24, "2026-10-21T23:22:24.000Z"],
+      ]),
     ),
   ]),
   machine("host-m5", "M5", [

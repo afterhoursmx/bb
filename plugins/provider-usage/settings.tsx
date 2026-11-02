@@ -28,6 +28,11 @@ import {
   type UsageSnapshot,
   type UsageWindow,
 } from "./usage-schema.js";
+import {
+  computeUsagePace,
+  describePaceMargin,
+  resolveTimeZone,
+} from "./usage-pace.js";
 function SettingsBadge({ children }: { children: ReactNode }) {
   return (
     <span className="shrink-0 rounded-sm border border-border bg-muted/40 px-1.5 py-0.5 text-2xs leading-none text-subtle-foreground">
@@ -109,7 +114,20 @@ function usageWindowValue(window: UsageWindow): string {
 }
 
 function UsageWindowRow({ window }: { window: UsageWindow }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (window.cycleStartsAt == null || window.resetsAt == null) return;
+    const timer = globalThis.setInterval(() => setNow(Date.now()), 60_000);
+    return () => globalThis.clearInterval(timer);
+  }, [window.cycleStartsAt, window.resetsAt]);
   const reset = formatReset(window.resetsAt);
+  const pace = computeUsagePace({
+    usedPercent: window.usedPercent,
+    cycleStartsAt: window.cycleStartsAt,
+    cycleEndsAt: window.resetsAt,
+    now,
+    timeZone: resolveTimeZone(),
+  });
   return (
     <div className="space-y-1">
       <div className="flex items-baseline justify-between gap-2">
@@ -118,7 +136,7 @@ function UsageWindowRow({ window }: { window: UsageWindow }) {
           {usageWindowValue(window)}
         </span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
         <div
           className={cn(
             "h-full rounded-full",
@@ -128,8 +146,22 @@ function UsageWindowRow({ window }: { window: UsageWindow }) {
             width: `${Math.min(100, Math.max(window.usedPercent, 2))}%`,
           }}
         />
+        {pace ? (
+          <span
+            aria-hidden="true"
+            className="absolute top-0 h-full w-px bg-foreground/70"
+            style={{
+              left: `${Math.min(100, Math.max(0, pace.idealPercent))}%`,
+            }}
+          />
+        ) : null}
       </div>
       {reset ? <p className="text-xs text-muted-foreground">{reset}</p> : null}
+      {pace ? (
+        <p className="text-xs tabular-nums text-muted-foreground">
+          {describePaceMargin(pace.marginPercent)}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -2,6 +2,11 @@
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UsageProvider } from "./usage-schema.js";
+import {
+  computeUsagePace,
+  formatPaceMargin,
+  resolveTimeZone,
+} from "./usage-pace.js";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import {
   loadPluginApp,
@@ -637,5 +642,136 @@ it("keeps a measured refresh when an older snapshot response arrives late", asyn
   );
   expect(slot.queryByText("Usage not reported.")).toBeNull();
   expect(slot.getByText("37%")).toBeTruthy();
+  await mounted.lifecycle.dispose();
+});
+
+it("shows separate Cursor quotas and compact pace without a combined bar", async () => {
+  const now = Date.parse("2026-11-02T18:42:00.000Z");
+  vi.spyOn(Date, "now").mockReturnValue(now);
+  const cycleStartsAt = "2026-10-21T23:22:24.000Z";
+  const cycleEndsAt = "2026-11-21T23:22:24.000Z";
+  const timeZone = resolveTimeZone();
+  const cursorMargin = formatPaceMargin(
+    computeUsagePace({
+      usedPercent: 23,
+      cycleStartsAt,
+      cycleEndsAt,
+      now,
+      timeZone,
+    })!.marginPercent,
+  );
+  const otherMargin = formatPaceMargin(
+    computeUsagePace({
+      usedPercent: 33,
+      cycleStartsAt,
+      cycleEndsAt,
+      now,
+      timeZone,
+    })!.marginPercent,
+  );
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      Response.json({
+        ok: true,
+        result: {
+          machines: [
+            {
+              id: "host-m4",
+              displayName: "M4",
+              status: "connected",
+              error: null,
+              providers: [
+                {
+                  id: "acp-cursor",
+                  providerId: "acp-cursor",
+                  accountLabel: null,
+                  displayName: "Cursor",
+                  logoUrl: "/api/v1/system/providers/acp-cursor/logo",
+                  icon: null,
+                  strings: { iconTint: null },
+                  signInHint: "Sign in to Cursor.",
+                  expiredHint: "Sign in to Cursor again.",
+                  usage: {
+                    status: "ok",
+                    accountEmail: "cursor@example.com",
+                    planLabel: "Ultra",
+                    windows: [
+                      {
+                        label: "Cursor Models",
+                        usedPercent: 23,
+                        resetsAt: cycleEndsAt,
+                        cycleStartsAt,
+                        cost: null,
+                      },
+                      {
+                        label: "Other Models",
+                        usedPercent: 33,
+                        resetsAt: cycleEndsAt,
+                        cycleStartsAt,
+                        cost: null,
+                      },
+                    ],
+                  },
+                },
+                {
+                  id: "codex",
+                  providerId: "codex",
+                  accountLabel: null,
+                  displayName: "Codex",
+                  logoUrl: "/api/v1/system/providers/codex/logo?h=codex",
+                  icon: null,
+                  strings: { iconTint: null },
+                  signInHint: "Sign in to Codex.",
+                  expiredHint: "Sign in to Codex again.",
+                  usage: {
+                    status: "ok",
+                    accountEmail: "codex@example.com",
+                    planLabel: "Plus",
+                    windows: [
+                      {
+                        label: "Weekly limit",
+                        usedPercent: 37,
+                        resetsAt: null,
+                        cost: null,
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ),
+  );
+  const app = await loadPluginApp(() => import("./app"));
+  const mounted = await mountPluginContentScripts(app, {
+    pluginId: "bb--provider-usage",
+  });
+  const item = app.experimentalSidebarFooterItems[0];
+  if (item?.kind !== "disclosure") throw new Error("missing disclosure");
+  const slot = renderSlot(
+    item,
+    { dismiss: vi.fn() },
+    { pluginId: "bb--provider-usage" },
+  );
+  await waitFor(() => expect(slot.getByText("23%")).toBeTruthy());
+  expect(slot.getByText("Cursor")).toBeTruthy();
+  expect(slot.getByText("Other")).toBeTruthy();
+  expect(slot.getByText("23%")).toBeTruthy();
+  expect(slot.getByText("33%")).toBeTruthy();
+  expect(slot.getAllByText(cursorMargin).length).toBeGreaterThan(0);
+  expect(slot.getByText(otherMargin)).toBeTruthy();
+  expect(slot.container.querySelectorAll("[data-usage-pace-ideal]")).toHaveLength(
+    2,
+  );
+  expect(slot.queryByText("Plan usage")).toBeNull();
+  fireEvent.click(slot.getByRole("tab", { name: "Codex" }));
+  expect(slot.getByText("37%")).toBeTruthy();
+  expect(slot.getByText("7d")).toBeTruthy();
+  expect(slot.queryByText("Cursor")).toBeNull();
+  expect(slot.queryByText("Plan usage")).toBeNull();
+  expect(slot.container.querySelector("[data-usage-pace-ideal]")).toBeNull();
   await mounted.lifecycle.dispose();
 });
